@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AX 거래</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #F5F4F0; --surface: #FFFFFF; --border: #E2E0D8;
+    --text: #1A1A18; --muted: #888780; --accent: #2563EB;
+    --accent-bg: #EFF6FF; --success: #16A34A; --success-bg: #F0FDF4;
+    --error: #DC2626; --error-bg: #FEF2F2;
+    --warning-bg: #FFFBEB; --warning: #D97706;
+  }
+  body { font-family: -apple-system, 'Noto Sans KR', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
+  .logo { font-size: 15px; font-weight: 600; }
+  .logo span { color: var(--accent); }
+  .tab-bar { display: flex; background: var(--bg); border-bottom: 1px solid var(--border); padding: 0 4px; }
+  .tab { flex: 1; padding: 10px 4px; font-size: 13px; font-weight: 500; color: var(--muted); border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; text-align: center; }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .page { display: none; padding: 16px; max-width: 600px; margin: 0 auto; }
+  .page.active { display: block; }
+
+  /* 입력 탭 */
+  .guide-box { background: var(--accent-bg); border: 1px solid #BFDBFE; border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; }
+  .guide-title { font-size: 11px; font-weight: 600; color: var(--accent); letter-spacing: 0.4px; margin-bottom: 8px; }
+  .guide-format { font-size: 13px; font-weight: 600; color: #1D4ED8; font-family: monospace; margin-bottom: 8px; }
+  .guide-rows { display: flex; flex-direction: column; gap: 4px; }
+  .guide-row { display: flex; align-items: baseline; gap: 8px; font-size: 12px; }
+  .guide-tag { background: #DBEAFE; color: #1D4ED8; border-radius: 4px; padding: 1px 6px; font-weight: 600; white-space: nowrap; min-width: 42px; text-align: center; }
+  .guide-tag.optional { background: #F1F5F9; color: #64748B; }
+  .guide-desc { color: var(--muted); }
+  .guide-ex { margin-top: 8px; padding-top: 8px; border-top: 1px solid #BFDBFE; font-size: 12px; color: #1E40AF; }
+  .input-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px; margin-bottom: 12px; }
+  .input-label { font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 8px; }
+  textarea { width: 100%; border: 1.5px solid var(--border); border-radius: 10px; padding: 12px 14px; font-size: 15px; font-family: inherit; line-height: 1.6; color: var(--text); background: var(--bg); resize: none; min-height: 90px; outline: none; transition: border-color 0.15s; }
+  textarea:focus { border-color: var(--accent); background: #fff; }
+  textarea::placeholder { color: #C0BDB4; }
+  .btn-submit { width: 100%; background: var(--accent); color: #fff; border: none; border-radius: 10px; padding: 14px; font-size: 15px; font-weight: 600; cursor: pointer; transition: background 0.15s, transform 0.1s; }
+  .btn-submit:active { transform: scale(0.98); }
+  .btn-submit:hover { background: #1D4ED8; }
+  .btn-submit:disabled { background: #93C5FD; cursor: not-allowed; transform: none; }
+  .status-box { border-radius: 10px; padding: 12px 14px; font-size: 13px; margin-top: 12px; display: none; line-height: 1.5; }
+  .status-box.loading { background: var(--accent-bg); color: var(--accent); display: block; }
+  .status-box.success { background: var(--success-bg); color: var(--success); display: block; }
+  .status-box.error { background: var(--error-bg); color: var(--error); display: block; }
+  .parsed-result { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-top: 10px; display: none; }
+  .parsed-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .parsed-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .parsed-row:last-child { border-bottom: none; }
+  .parsed-key { color: var(--muted); min-width: 60px; }
+  .parsed-val { font-weight: 500; text-align: right; }
+  .badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 10px; }
+  .badge-ok { background: var(--success-bg); color: var(--success); }
+  .badge-warn { background: var(--warning-bg); color: var(--warning); }
+  .loading-spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #fff; border-top-color: transparent; border-radius: 50%; animation: spin 0.7s linear infinite; margin-right: 6px; vertical-align: -2px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* 대시보드 탭 */
+  .section-title { font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: 0.5px; text-transform: uppercase; margin: 16px 0 8px; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 4px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+  .stat-label { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .stat-value { font-size: 22px; font-weight: 600; }
+  .stat-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .stat-card.accent { background: var(--accent-bg); border-color: #BFDBFE; }
+  .stat-card.accent .stat-value { color: var(--accent); }
+
+  /* 목표 게이지 */
+  .goal-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 4px; }
+  .goal-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+  .goal-label { font-size: 12px; color: var(--muted); }
+  .goal-pct { font-size: 20px; font-weight: 600; color: var(--accent); }
+  .gauge-bg { background: #E2E0D8; border-radius: 99px; height: 10px; overflow: hidden; }
+  .gauge-fill { height: 100%; border-radius: 99px; background: var(--accent); transition: width 0.6s ease; }
+  .gauge-fill.done { background: var(--success); }
+  .goal-amounts { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 6px; }
+  .goal-edit { font-size: 11px; color: var(--accent); cursor: pointer; text-decoration: underline; }
+
+  /* 순위 카드 */
+  .rank-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 10px; }
+  .rank-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+  .rank-row:last-child { border-bottom: none; }
+  .rank-num { font-size: 13px; font-weight: 600; color: var(--muted); min-width: 18px; }
+  .rank-name { font-size: 13px; font-weight: 500; flex: 1; }
+  .rank-bar-wrap { flex: 2; background: var(--bg); border-radius: 99px; height: 6px; overflow: hidden; }
+  .rank-bar { height: 100%; border-radius: 99px; background: var(--accent); }
+  .rank-val { font-size: 12px; color: var(--muted); min-width: 60px; text-align: right; }
+
+  /* 내역 탭 */
+  .week-nav { display: flex; align-items: center; justify-content: space-between; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; margin-bottom: 12px; }
+  .week-label { font-size: 14px; font-weight: 600; }
+  .week-btn { background: none; border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer; color: var(--text); }
+  .week-btn:hover { background: var(--bg); }
+  .week-summary { display: flex; gap: 12px; font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .day-group { margin-bottom: 14px; }
+  .day-header { font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 6px; display: flex; justify-content: space-between; }
+  .record-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 6px; }
+  .record-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; }
+  .record-company { font-size: 14px; font-weight: 600; }
+  .record-amount { font-size: 14px; font-weight: 600; color: var(--accent); }
+  .record-item { font-size: 12px; color: var(--muted); margin-bottom: 2px; }
+  .record-time { font-size: 11px; color: #C0BDB4; }
+  .tag-외상 { display: inline-block; font-size: 10px; font-weight: 600; background: var(--warning-bg); color: var(--warning); border-radius: 6px; padding: 1px 6px; margin-left: 4px; }
+  .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+  .refresh-btn { display: block; width: 100%; background: none; border: 1px solid var(--border); border-radius: 10px; padding: 10px; font-size: 13px; color: var(--muted); cursor: pointer; margin-bottom: 12px; }
+  .refresh-btn:hover { background: var(--surface); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">AX<span>거래</span></div>
+  <div style="font-size:12px; color:var(--muted);" id="today-date"></div>
+</header>
+
+<div class="tab-bar">
+  <button class="tab active" onclick="switchTab('input', this)">입력</button>
+  <button class="tab" onclick="switchTab('dashboard', this)">대시보드</button>
+  <button class="tab" onclick="switchTab('history', this)">내역</button>
+</div>
+
+<!-- 탭1: 입력 -->
+<div id="page-input" class="page active">
+  <div class="guide-box">
+    <div class="guide-title">입력 형식</div>
+    <div class="guide-format">거래처  품목  [규격]  수량+단위  [금액]  [비고]</div>
+    <div class="guide-rows">
+      <div class="guide-row"><span class="guide-tag">거래처</span><span class="guide-desc">회사명 — 첫 번째 단어</span></div>
+      <div class="guide-row"><span class="guide-tag">품목</span><span class="guide-desc">품목명</span></div>
+      <div class="guide-row"><span class="guide-tag optional">규격</span><span class="guide-desc">M10 · M8 · 10mm 등 (선택)</span></div>
+      <div class="guide-row"><span class="guide-tag">수량</span><span class="guide-desc">200개 · 3세트 · 10박스</span></div>
+      <div class="guide-row"><span class="guide-tag optional">금액</span><span class="guide-desc">50만원 · 85000원 (선택)</span></div>
+      <div class="guide-row"><span class="guide-tag optional">비고</span><span class="guide-desc">외상 · 선불 · 현금 · 미수 (선택)</span></div>
+    </div>
+    <div class="guide-ex">
+      예) 기아차 M10볼트 200개 50만원<br>
+      예) 현대모비스 너트 M8 500개 85000원 외상
+    </div>
+  </div>
+  <div class="input-card">
+    <div class="input-label">거래 메모</div>
+    <textarea id="memo-input" placeholder="기아차 M10볼트 200개 50만원"></textarea>
+  </div>
+  <button class="btn-submit" id="submit-btn" onclick="submitMemo()">저장</button>
+  <div class="status-box" id="status-box"></div>
+  <div class="parsed-result" id="parsed-result"></div>
+</div>
+
+<!-- 탭2: 대시보드 -->
+<div id="page-dashboard" class="page">
+  <button class="refresh-btn" onclick="loadData()">↻ 새로고침</button>
+
+  <div class="section-title">오늘</div>
+  <div class="stat-grid">
+    <div class="stat-card accent">
+      <div class="stat-label">거래 건수</div>
+      <div class="stat-value" id="d-today-count">—</div>
+      <div class="stat-sub">건</div>
+    </div>
+    <div class="stat-card accent">
+      <div class="stat-label">매출</div>
+      <div class="stat-value" id="d-today-amt">—</div>
+      <div class="stat-sub">원</div>
+    </div>
+  </div>
+
+  <div class="goal-card" style="margin-top:10px;">
+    <div class="goal-top">
+      <div>
+        <div style="font-size:12px; color:var(--muted); margin-bottom:2px;">오늘 목표 달성률</div>
+        <div style="font-size:11px; color:var(--muted);">목표: <span id="d-goal-label">200만원</span> &nbsp;<span class="goal-edit" onclick="editGoal()">변경</span></div>
+      </div>
+      <div class="goal-pct" id="d-goal-pct">0%</div>
+    </div>
+    <div class="gauge-bg"><div class="gauge-fill" id="d-gauge" style="width:0%"></div></div>
+    <div class="goal-amounts">
+      <span id="d-goal-current">0원</span>
+      <span id="d-goal-target">목표 200만원</span>
+    </div>
+  </div>
+
+  <div class="section-title">이번 달</div>
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="stat-label">누적 매출</div>
+      <div class="stat-value" id="d-month-amt">—</div>
+      <div class="stat-sub" id="d-month-count">— 건</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">외상 거래</div>
+      <div class="stat-value" id="d-credit-count" style="color:var(--warning)">—</div>
+      <div class="stat-sub" id="d-credit-amt">— 원</div>
+    </div>
+  </div>
+
+  <div class="section-title">거래처 Top 3 (이번 달)</div>
+  <div class="rank-card" id="d-client-rank">
+    <div class="empty-state" style="padding:20px">불러오는 중...</div>
+  </div>
+
+  <div class="section-title">품목 Top 3 (이번 달)</div>
+  <div class="rank-card" id="d-item-rank">
+    <div class="empty-state" style="padding:20px">불러오는 중...</div>
+  </div>
+</div>
+
+<!-- 탭3: 내역 -->
+<div id="page-history" class="page">
+  <button class="refresh-btn" onclick="loadData()">↻ 새로고침</button>
+  <div class="week-nav">
+    <button class="week-btn" onclick="changeWeek(-1)">◀</button>
+    <div style="text-align:center;">
+      <div class="week-label" id="h-week-label">이번 주</div>
+      <div class="week-summary"><span id="h-week-count">— 건</span><span id="h-week-amt">— 원</span></div>
+    </div>
+    <button class="week-btn" onclick="changeWeek(1)">▶</button>
+  </div>
+  <div id="h-records"></div>
+</div>
+
+<script>
+const SHEET_URL = 'https://script.google.com/macros/s/AKfycbwgIS7ry9tgA-GJlm0TPhfu1pmNU_hvxhaDPo4-QYb2tJdYd5dw9JtQ74LUFkvfo8I/exec';
+let allRecords = [];
+let weekOffset = 0;
+let dailyGoal = parseInt(localStorage.getItem('dailyGoal') || '2000000');
+
+document.getElementById('today-date').textContent =
+  new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' });
+
+function switchTab(tab, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('page-' + tab).classList.add('active');
+  if (tab === 'dashboard' || tab === 'history') loadData();
+}
+
+async function loadData() {
+  try {
+    const res = await fetch(SHEET_URL + '?t=' + Date.now());
+    const data = await res.json();
+    allRecords = data.filter(r => r['거래처'] || r['품목']);
+    renderDashboard();
+    renderHistory();
+  } catch(e) {
+    console.log('로드 실패', e);
+  }
+}
+
+// ── 대시보드 ──
+function renderDashboard() {
+  const now = new Date();
+  const todayStr = now.toDateString();
+  const thisMonth = now.getMonth();
+  const thisYear = now.getFullYear();
+
+  const todayRecs = allRecords.filter(r => new Date(r['타임스탬프']).toDateString() === todayStr);
+  const monthRecs = allRecords.filter(r => {
+    const d = new Date(r['타임스탬프']);
+    return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
+  });
+
+  const todayAmt = todayRecs.reduce((s, r) => s + (Number(r['금액']) || 0), 0);
+  const monthAmt = monthRecs.reduce((s, r) => s + (Number(r['금액']) || 0), 0);
+  const creditRecs = monthRecs.filter(r => r['비고'] === '외상' || r['비고'] === '미수');
+  const creditAmt = creditRecs.reduce((s, r) => s + (Number(r['금액']) || 0), 0);
+
+  document.getElementById('d-today-count').textContent = todayRecs.length;
+  document.getElementById('d-today-amt').textContent = fmtAmt(todayAmt);
+  document.getElementById('d-month-amt').textContent = fmtAmt(monthAmt);
+  document.getElementById('d-month-count').textContent = monthRecs.length + ' 건';
+  document.getElementById('d-credit-count').textContent = creditRecs.length;
+  document.getElementById('d-credit-amt').textContent = fmtAmt(creditAmt);
+
+  // 게이지
+  const pct = Math.min(Math.round(todayAmt / dailyGoal * 100), 100);
+  document.getElementById('d-goal-pct').textContent = pct + '%';
+  document.getElementById('d-goal-label').textContent = fmtAmt(dailyGoal);
+  document.getElementById('d-goal-target').textContent = '목표 ' + fmtAmt(dailyGoal);
+  document.getElementById('d-goal-current').textContent = fmtAmt(todayAmt);
+  const gauge = document.getElementById('d-gauge');
+  gauge.style.width = pct + '%';
+  gauge.className = 'gauge-fill' + (pct >= 100 ? ' done' : '');
+
+  // 거래처 Top 3
+  const clientMap = {};
+  monthRecs.forEach(r => {
+    if (!r['거래처']) return;
+    clientMap[r['거래처']] = (clientMap[r['거래처']] || 0) + (Number(r['금액']) || 0);
+  });
+  renderRank('d-client-rank', clientMap, '원');
+
+  // 품목 Top 3
+  const itemMap = {};
+  monthRecs.forEach(r => {
+    if (!r['품목']) return;
+    itemMap[r['품목']] = (itemMap[r['품목']] || 0) + (Number(r['수량']) || 0);
+  });
+  renderRank('d-item-rank', itemMap, '개');
+}
+
+function renderRank(id, map, unit) {
+  const el = document.getElementById(id);
+  const sorted = Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  if (!sorted.length) { el.innerHTML = '<div class="empty-state" style="padding:16px">이번 달 데이터 없음</div>'; return; }
+  const max = sorted[0][1];
+  el.innerHTML = sorted.map(([name, val], i) => `
+    <div class="rank-row">
+      <span class="rank-num">${i + 1}</span>
+      <span class="rank-name">${name}</span>
+      <div class="rank-bar-wrap"><div class="rank-bar" style="width:${Math.round(val/max*100)}%"></div></div>
+      <span class="rank-val">${unit === '원' ? fmtAmt(val) : val + unit}</span>
+    </div>`).join('');
+}
+
+function editGoal() {
+  const input = prompt('일 목표 매출 입력 (원 단위)\n예) 2000000', dailyGoal);
+  if (input && !isNaN(input)) {
+    dailyGoal = parseInt(input);
+    localStorage.setItem('dailyGoal', dailyGoal);
+    renderDashboard();
+  }
+}
+
+// ── 내역 ──
+function changeWeek(dir) {
+  weekOffset += dir;
+  if (weekOffset > 0) weekOffset = 0;
+  renderHistory();
+}
+
+function renderHistory() {
+  const now = new Date();
+  const day = now.getDay();
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1) + weekOffset * 7);
+  monday.setHours(0, 0, 0, 0);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
+
+  const label = weekOffset === 0 ? '이번 주' :
+    weekOffset === -1 ? '지난 주' :
+    `${monday.getMonth()+1}/${monday.getDate()} — ${sunday.getMonth()+1}/${sunday.getDate()}`;
+  document.getElementById('h-week-label').textContent = label;
+
+  const weekRecs = allRecords.filter(r => {
+    const d = new Date(r['타임스탬프']);
+    return d >= monday && d <= sunday;
+  });
+
+  const weekAmt = weekRecs.reduce((s, r) => s + (Number(r['금액']) || 0), 0);
+  document.getElementById('h-week-count').textContent = weekRecs.length + ' 건';
+  document.getElementById('h-week-amt').textContent = fmtAmt(weekAmt);
+
+  // 날짜별 그룹
+  const groups = {};
+  weekRecs.forEach(r => {
+    const d = new Date(r['타임스탬프']);
+    const key = d.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' });
+    if (!groups[key]) groups[key] = { recs: [], amt: 0 };
+    groups[key].recs.push(r);
+    groups[key].amt += Number(r['금액']) || 0;
+  });
+
+  const el = document.getElementById('h-records');
+  if (!weekRecs.length) {
+    el.innerHTML = '<div class="empty-state">이 주 거래 내역이 없어요.</div>';
+    return;
+  }
+
+  el.innerHTML = Object.entries(groups).reverse().map(([date, { recs, amt }]) => `
+    <div class="day-group">
+      <div class="day-header">
+        <span>${date}</span>
+        <span>${fmtAmt(amt)}</span>
+      </div>
+      ${recs.reverse().map(r => {
+        const time = new Date(r['타임스탬프']).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+        const item = [r['품목'], r['규격'], r['수량'] ? r['수량'] + (r['단위'] || '') : ''].filter(Boolean).join(' · ');
+        const amt2 = r['금액'] ? Number(r['금액']).toLocaleString() + '원' : '';
+        return `<div class="record-card">
+          <div class="record-top">
+            <div class="record-company">${r['거래처'] || '—'}${r['비고'] ? `<span class="tag-외상">${r['비고']}</span>` : ''}</div>
+            <div class="record-amount">${amt2}</div>
+          </div>
+          <div class="record-item">${item || '—'}</div>
+          <div class="record-time">${time}</div>
+        </div>`;
+      }).join('')}
+    </div>`).join('');
+}
+
+// ── 입력 ──
+function parseText(text) {
+  const result = { 거래처:'', 품목:'', 규격:'', 수량:'', 단위:'', 금액:'', 비고:'', 파싱상태:'완료' };
+  let s = text.trim();
+  const 비고목록 = ['외상','선불','현금','카드','미수','완납','보류'];
+  for (const k of 비고목록) { if (s.includes(k)) { result.비고 = k; s = s.replace(k,'').trim(); break; } }
+  const 금액m = s.match(/(\d[\d,]*)\s*만\s*원?|(\d[\d,]*)\s*원/);
+  if (금액m) { result.금액 = 금액m[1] ? String(parseInt(금액m[1].replace(/,/g,''))*10000) : 금액m[2].replace(/,/g,''); s = s.replace(금액m[0],'').trim(); }
+  const 수량m = s.match(/(\d+)\s*(개|세트|박스|묶음|롤|통|장|본|쌍|켤레|팩)/);
+  if (수량m) { result.수량 = 수량m[1]; result.단위 = 수량m[2]; s = s.replace(수량m[0],'').trim(); }
+  const 규격m = s.match(/[Mm]\d+(\.\d+)?|\d+(\.\d+)?\s*[Mm][Mm]|#\d+/);
+  if (규격m) { result.규격 = 규격m[0].toUpperCase().replace(/\s/g,''); s = s.replace(규격m[0],'').trim(); }
+  const parts = s.split(/\s+/).filter(Boolean);
+  if (parts.length >= 1) result.거래처 = parts[0];
+  if (parts.length >= 2) result.품목 = parts.slice(1).join(' ');
+  if (!result.거래처 || !result.품목) result.파싱상태 = '불확실';
+  return result;
+}
+
+async function submitMemo() {
+  const raw = document.getElementById('memo-input').value.trim();
+  if (!raw) return;
+  const btn = document.getElementById('submit-btn');
+  const statusBox = document.getElementById('status-box');
+  const parsedDiv = document.getElementById('parsed-result');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loading-spinner"></span>저장 중...';
+  statusBox.className = 'status-box loading';
+  statusBox.textContent = '저장 중...';
+  parsedDiv.style.display = 'none';
+  try {
+    const parsed = parseText(raw);
+    await saveToSheet({ raw, ...parsed });
+    statusBox.className = 'status-box success';
+    statusBox.textContent = '✓ 저장 완료';
+    parsedDiv.style.display = 'block';
+    parsedDiv.innerHTML = renderParsed(parsed);
+    document.getElementById('memo-input').value = '';
+    setTimeout(() => { statusBox.style.display = 'none'; }, 3000);
+  } catch(err) {
+    statusBox.className = 'status-box error';
+    statusBox.textContent = '저장 실패: ' + err.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '저장';
+  }
+}
+
+async function saveToSheet(data) {
+  await fetch(SHEET_URL, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) });
+}
+
+function renderParsed(p) {
+  const badge = p.파싱상태 === '완료' ? '<span class="badge badge-ok">인식 완료</span>' : '<span class="badge badge-warn">확인 필요</span>';
+  const rows = [['거래처',p.거래처||'—'],['품목',p.품목||'—'],['규격',p.규격||'—'],['수량',p.수량?p.수량+' '+(p.단위||''):'—'],['금액',p.금액?Number(p.금액).toLocaleString()+'원':'—'],['비고',p.비고||'—']];
+  return `<div class="parsed-header"><span style="font-size:12px;font-weight:600;color:var(--muted);">인식 결과</span>${badge}</div>` +
+    rows.map(([k,v]) => `<div class="parsed-row"><span class="parsed-key">${k}</span><span class="parsed-val">${v}</span></div>`).join('');
+}
+
+function fmtAmt(n) {
+  if (!n) return '0';
+  if (n >= 10000) return Math.round(n/10000) + '만';
+  return n.toLocaleString();
+}
+</script>
+</body>
+</html>
